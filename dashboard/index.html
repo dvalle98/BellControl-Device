@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de Campana</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans">
+    <div class="container mx-auto p-6 max-w-4xl">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Programación Semanal</h1>
+        
+        <div id="schedule" class="card">
+            <div id="days" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Se generarán dinámicamente los días con sus cards -->
+            </div>
+            <button id="saveSchedule" class="btn btn-primary mt-6">Guardar Horario</button>
+        </div>
+
+        <div class="mt-8 card">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Control Manual</h2>
+            <button id="ringBell" class="btn btn-danger">Tocar Campana</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
