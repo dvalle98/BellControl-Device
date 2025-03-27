@@ -21,13 +21,13 @@ BellControl-Device es un sistema basado en ESP32 para el control automatizado de
 
 ```
 BellControl-Device/
-├── src/                 # Código fuente del firmware
-│   ├── main.cpp         # Programa principal
-│   ├── mqtt_handler.cpp # Manejo de MQTT
+├── BellControl/         # Código fuente del firmware
+│   ├── BellControl.ino  # Programa principal
 │   ├── config.h         # Configuración del dispositivo
-├── web/                 # Archivos de la interfaz web
+├── dashboard/           # Archivos de la interfaz web
 │   ├── index.html       # Panel de configuración
-│   ├── app.js          # Lógica de la interfaz
+│   ├── script.js        # Lógica de la interfaz
+│   ├── styles.caa       # Estilos de la interfaz
 ├── README.md            # Documentación
 ```
 
