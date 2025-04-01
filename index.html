@@ -7,16 +7,20 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/128/456/456127.png" type="image/png">
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans">
     <div class="container mx-auto p-6 max-w-4xl">
                 
         <div id="schedule" class="card">
             <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Programación Semanal</h1>
-            <div id="days" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 gap-3">
+            <div id="days" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <!-- Se generarán dinámicamente los días con sus cards -->
             </div>
-            <button id="saveSchedule" class="btn btn-primary mt-6">Guardar Horario</button>
+            <div class="flex justify-between mt-6 gap-4">
+                <button id="saveSchedule" class="btn btn-primary">Guardar Horario</button>
+                <button id="loadSchedule" class="btn btn-success">Cargar Horario</button>
+            </div>
         </div>
 
         <div class="mt-8 card">

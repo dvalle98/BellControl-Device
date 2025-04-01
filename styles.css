@@ -5,7 +5,7 @@ body {
 /* Container */
 .container {
     min-width: 320px; /* Set a minimum width for the container */
-    max-width: 1200px; /* Set a maximum width for the container */
+    max-width: 1000px; /* Set a maximum width for the container */
     margin: 0 auto; /* Center the container */
 }
 
