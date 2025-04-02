@@ -113,7 +113,7 @@ El dispositivo se comunica mediante MQTT usando los siguientes tópicos:
       "V": [
         "07:15",
         "08:00",
-        "08:45",+
+        "08:45",
         "09:00",
         "09:15",
         "10:00",
