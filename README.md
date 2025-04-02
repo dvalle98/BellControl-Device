@@ -35,11 +35,15 @@ BellControl-Device/
 
 El dispositivo se comunica mediante MQTT usando los siguientes tópicos:
 
-| Tópico                      | Descripción                           |
-|------------------------------|---------------------------------------|
-| `bellcontrol/v1/config`      | Recibe la configuración de horarios  |
-| `bellcontrol/v1/control`     | Comando para accionar la campana     |
-| `bellcontrol/v1/status`      | Publica el estado del dispositivo    |
+| Tópico                      | Descripción                           | Descripción                           |
+|------------------------------|---------------------------------------| Plataforma -> Dispositivo            |
+| `bellcontrol/v1/configSchedule`      | Configuración de horarios  | Plataforma -> Dispositivo            |
+| `bellcontrol/v1/configSchedule_reply`     | Respuesta a configuración de horario     | Dispositivo -> Plataforma             |
+| `bellcontrol/v1/remoteControl`      | Accionar campana    | Plataforma -> Dispositivo            |
+| `bellcontrol/v1/remoteControl_reply`      | Respuesta a accionar campana  | Dispositivo -> Plataforma             |
+| `bellcontrol/v1/requestSchedule`     | Obtener configuración de horarios     | Plataforma -> Dispositivo            |
+| `bellcontrol/v1/requestSchedule_reply`     | Respuesta a Obtener configuración de horarios     | Dispositivo -> Plataforma             |
+| `bellcontrol/v1/status`      | Publica el estado del dispositivo    | Dispositivo -> Plataforma            |
 
 ### Ejemplo de payload JSON para configuración:
 ```json
