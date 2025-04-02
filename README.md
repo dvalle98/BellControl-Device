@@ -1,21 +1,29 @@
 # BellControl-Device
 
-BellControl-Device es un sistema basado en ESP32 para el control automatizado de una campana escolar. Permite programar y gestionar los horarios de activación de la campana mediante MQTT y una interfaz web de configuración.
+BellControl-Device es un sistema basado en ESP32 diseñado para el control automatizado de una campana escolar. Permite programar y gestionar los horarios de activación mediante una interfaz web intuitiva y comandos MQTT, asegurando una administración eficiente y remota del sistema.
 
 ## Características principales
 
-- **Control automatizado** de una campana escolar.
-- **Interfaz web** para configurar los horarios de funcionamiento.
-- **Conectividad MQTT** para el control remoto.
-- **Almacenamiento de configuración** en memoria no volátil (NVS).
-- **Accionamiento manual remoto** a través de comandos MQTT.
+- **Automatización completa** del funcionamiento de la campana según horarios programados.
+
+- **Interfaz web para** 
+- Configurar horarios y cargar los almacenados en el dispositivo
+- Accionar remotamente la campana con tiempo ajustable o un valor predeterminado de 2 segundos.
+- Visualizar respuestas del dispositivo 
+
+- **Conectividad MQTT** utilizada como medio de comunicación entre la interfaz web y el dispositivo para la administración y control.
+
+- **Almacenamiento persistente** de la configuración en la memoria NVS del ESP32.
 
 ## Tecnologías utilizadas
 
-- **Hardware**: ESP32
-- **Firmware**: Arduino (ESP-IDF/Arduino framework)
-- **Protocolos**: MQTT, WiFi
-- **Interfaz Web**: HTML, CSS, JavaScript (TailwindCSS)
+- **Hardware:** ESP32
+
+- **Firmware:** Arduino (ESP-IDF/Arduino framework)
+
+- **Protocolos:** MQTT, WiFi
+
+- **Interfaz Web:** HTML, CSS, JavaScript (TailwindCSS)
 
 ## Estructura del Proyecto
 
@@ -119,7 +127,7 @@ El dispositivo se comunica mediante MQTT usando los siguientes tópicos:
 }
 ```
 
-##Instalación y Uso
+## Instalación y Uso
 
 1. Clonar el repositorio
 ```sh
@@ -128,29 +136,29 @@ El dispositivo se comunica mediante MQTT usando los siguientes tópicos:
 
 2. Cargar el firmware en el ESP32
 
-Abre el código en Arduino IDE o VS Code con PlatformIO.
+- Abre el código BellControl.ino en Arduino IDE o VS Code con PlatformIO.
 
-Conecta el ESP32 y sube el firmware.
+- Conecta el ESP32 y sube el firmware.
 
 3. Configuración del WiFi
 
-No es necesario configurar credenciales WiFi en el código.
+- No es necesario configurar credenciales WiFi en el código.
 
-El dispositivo usa WiFiManager para la configuración de red.
+- El dispositivo usa WiFiManager para la configuración de red.
 
-Al encenderse por primera vez (o si no tiene conexión WiFi), el ESP32 creará una red llamada "BellControl".
+- Al encenderse por primera vez (o si no tiene conexión WiFi), el ESP32 creará una red llamada "BellControl-AP".
 
-Conéctate a esta red desde un móvil o PC y abre un navegador en 192.168.4.1 para ingresar los datos de la red WiFi.
+- Conéctate a esta red desde un móvil o PC y abre un navegador en 192.168.4.1 para ingresar los datos de la red WiFi.
 
 4. Configuración de Horarios
 
-Accede a la interfaz web del dispositivo cuando esté conectado a la red WiFi.
+- Accede a la interfaz web cuando el dispositivo esté conectado a la red WiFi y MQTT.
 
-Ingresa los horarios en los que debe sonar la campana.
+- Ingresa los horarios en los que debe sonar la campana.
 
-Guarda la configuración para que se almacene en la memoria del dispositivo.
+- Guarda la configuración para que se almacene en la memoria del dispositivo.
 
-Los horarios se guardarán en la memoria NVS del ESP32 y serán usados para activar la campana en los momentos programados.
+### Los horarios se guardarán en la memoria NVS del ESP32 y serán usados para activar la campana en los momentos programados.
 
 ## Contribución
 
