@@ -7,9 +7,9 @@ BellControl-Device es un sistema basado en ESP32 diseñado para el control autom
 - **Automatización completa** del funcionamiento de la campana según horarios programados.
 
 - **Interfaz web para** 
-  Configurar horarios y cargar los almacenados en el dispositivo
-  Accionar remotamente la campana con tiempo ajustable o un valor predeterminado de 2 segundos.
-  Visualizar respuestas del dispositivo 
+  configurar horarios y cargar los almacenados en el dispositivo,
+  accionar remotamente la campana con tiempo ajustable o un valor predeterminado de 2 segundos,
+  visualizar respuestas del dispositivo. 
 
 - **Conectividad MQTT** utilizada como medio de comunicación entre la interfaz web y el dispositivo para la administración y control.
 
