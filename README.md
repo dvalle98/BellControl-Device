@@ -24,10 +24,10 @@ BellControl-Device/
 ├── BellControl/         # Código fuente del firmware
 │   ├── BellControl.ino  # Programa principal
 │   ├── config.h         # Configuración del dispositivo
-├── dashboard/           # Archivos de la interfaz web
-│   ├── index.html       # Panel de configuración
-│   ├── script.js        # Lógica de la interfaz
-│   ├── styles.caa       # Estilos de la interfaz
+├  # Archivos de la interfaz web
+│── index.html           # Panel de configuración
+│── script.js            # Lógica de la interfaz
+│── styles.caa           # Estilos de la interfaz
 ├── README.md            # Documentación
 ```
 
