@@ -4,8 +4,12 @@ struct AppConfig {
   const int mqttPort;
   const char* mqttUser;
   const char* mqttPassword;
-  const char* topicConfig;
-  const char* topicControl;
+  const char* topicConfigSchedule;
+  const char* topicConfigSchedule_reply;
+  const char* topicRemoteControl;
+  const char* topicRemoteControl_reply;
+  const char* topicRequestSchedule;
+  const char* topicRequestSchedule_reply;
   const char* topicStatus;
   const int wifiCheckInterval;
   const int maxReconnectAttempts;
@@ -18,17 +22,21 @@ struct AppConfig {
 };
 
 const AppConfig config PROGMEM = {
-  "mosquito.co",          // mqttBroker
-  1883,                      // mqttPort
-  "user",                    // mqttUser
-  "password",              // mqttPassword
-  "bellcontrol/v1/config",   // topicConfig
-  "bellcontrol/v1/control",  // topicControl
-  "bellcontrol/v1/status",   // topicStatus
-  3000,                      // wifiCheckInterval (ms)
-  5,                         // maxReconnectAttempts
-  15,                        // buzzerPin
-  4,                         // relay pin
+  "18.212.130.131",                        // mqttBroker
+  1883,                                    // mqttPort
+  "test",                                  // mqttUser
+  "CloudTech*",                            // mqttPassword
+  "bellcontrol/v1/configSchedule",         // topicConfig
+  "bellcontrol/v1/configSchedule_reply",   // topicConfig to reply
+  "bellcontrol/v1/remoteControl",          // topicControl
+  "bellcontrol/v1/remoteControl_reply",    // topicControl to reply
+  "bellcontrol/v1/requestSchedule",        // topicControl
+  "bellcontrol/v1/requestSchedule_reply",  // topicControl to reply
+  "bellcontrol/v1/status",                 // topicStatus
+  5000,                                    // wifiCheckInterval (ms)
+  5,                                       // maxReconnectAttempts
+  15,                                      // buzzerPin
+  4,                                       // relay pin
   27,
   32,
   14,
@@ -63,6 +71,8 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", -18000, 10000);  // Offset de -5 ho
 QueueHandle_t mqttQueue = NULL;
 SemaphoreHandle_t BellSystemState = NULL;
 SemaphoreHandle_t mqttSendMessage = NULL;
+SemaphoreHandle_t serialMutex = NULL;
+SemaphoreHandle_t nvsMutex = NULL;
 TaskHandle_t wifiTaskHandle = NULL;
 TaskHandle_t mqttTaskHandle = NULL;
 TaskHandle_t timeTaskHandle = NULL;
@@ -72,12 +82,13 @@ TaskHandle_t mqttProcessorTaskHandle = NULL;
 // Prototipos de funciones
 //------------------------------------------------------------------
 bool initHardware();
-void wifiTask(void* pvParameters);
+void keepWifiTask(void* pvParameters);
 void mqttCallback(char* topic, byte* payload, unsigned int length);
-void MQTTTask(void* parameter);
+void keepMQTTTask(void* parameter);
 void activateBell(int durationMs);
-void testBuzzer(int durationMs);
+void activateBuzzer(int durationMs);
 void sendMqttResponse(const char* topic, const char* message);
 void updateSystemState(SystemState newState);
 void startConfigPortal();
+void safeSerialPrint(const char* format, ...);
 void safeDelay(uint32_t ms);

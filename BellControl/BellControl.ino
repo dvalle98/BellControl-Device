@@ -3,10 +3,13 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
+#include "freertos/semphr.h"
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include "config.h"
+
 
 void setup() {
   Serial.begin(115200);
@@ -38,19 +41,31 @@ void setup() {
   // Creación de objetos FreeRTOS
   BellSystemState = xSemaphoreCreateMutex();
   if (BellSystemState == NULL) {
-    Serial.println("Error creando mutex");
+    Serial.println("Error creando BellSystemState");
     ESP.restart();
   }
 
   mqttSendMessage = xSemaphoreCreateMutex();
   if (mqttSendMessage == NULL) {
-    Serial.printf("Error creando mutex");
+    Serial.printf("Error creando mqttSendMessage");
+    ESP.restart();
+  }
+
+  serialMutex = xSemaphoreCreateMutex();
+  if (serialMutex == NULL) {
+    Serial.printf("Error creando serialMutex");
+    ESP.restart();
+  }
+
+  nvsMutex = xSemaphoreCreateMutex();
+  if (nvsMutex == NULL) {
+    Serial.printf("Error creando serialMutex");
     ESP.restart();
   }
 
   mqttQueue = xQueueCreate(5, sizeof(MQTTMessage*));  // Cola de punteros
   if (mqttQueue == NULL) {
-    Serial.println("Error creando cola MQTT");
+    Serial.println("Error creando mqttQueue");
     ESP.restart();
   }
 
@@ -60,8 +75,8 @@ void setup() {
   BaseType_t taskStatus;
 
   taskStatus = xTaskCreatePinnedToCore(
-    wifiTask,
-    "WiFiManager",
+    keepWifiTask,
+    "keepWifiTask",
     8192,
     NULL,
     5,
@@ -84,33 +99,18 @@ void setup() {
     0  // Core 0
   );
 
-  if (taskStatus != pdPASS) {
-    Serial.printf("Error creando tarea MQTT (Código: %d)", taskStatus);
-    ESP.restart();
-  }
-
-  // Crear tarea monitorear la conexion mqtt
-  taskStatus = xTaskCreatePinnedToCore(
-    MQTTTask,
-    "MQTTTask",
-    8192,  // Stack mayor para procesamiento JSON
-    NULL,
-    3,
-    &mqttTaskHandle,
-    1);
-
-  if (taskStatus != pdPASS) {
-    Serial.printf("Error creando tarea MQTT (Código: %d)", taskStatus);
-    ESP.restart();
-  }
-
   // Crear tarea para manejo de tiempo
+  if (taskStatus != pdPASS) {
+    Serial.printf("Error creando tarea MQTT (Código: %d)", taskStatus);
+    ESP.restart();
+  }
+
   taskStatus = xTaskCreatePinnedToCore(
     timeTask,
     "TimeTask",
-    4096,
+    8192,
     NULL,
-    2,
+    3,
     &timeTaskHandle,
     1);
 
@@ -119,7 +119,21 @@ void setup() {
     ESP.restart();
   }
 
-  Serial.println("Inicialización completa");
+  // Crear tarea monitorear la conexion mqtt
+  taskStatus = xTaskCreatePinnedToCore(
+    keepMQTTTask,
+    "keepMQTTTask",
+    4096,  // Stack mayor para procesamiento JSON
+    NULL,
+    2,
+    &mqttTaskHandle,
+    1);
+
+  if (taskStatus != pdPASS) {
+    Serial.printf("Error creando tarea MQTT (Código: %d)", taskStatus);
+    ESP.restart();
+  }
+  safeSerialPrint("Inicialización completa");
 }
 
 void loop() {
@@ -157,7 +171,7 @@ bool initHardware() {
 }
 
 /* ******************* TAREAS ******************* */
-void wifiTask(void* pvParameters) {
+void keepWifiTask(void* pvParameters) {
   uint8_t reconnectAttempts = 0;
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
@@ -165,59 +179,59 @@ void wifiTask(void* pvParameters) {
     vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(config.wifiCheckInterval));
 
     if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("WiFi Desconectado");
+      safeSerialPrint("WiFi Desconectado");
       updateSystemState(SystemState::BELL_WIFI_DISCONNECTED);
 
       if (reconnectAttempts >= config.maxReconnectAttempts) {
-        Serial.println("Máximos intentos de conexión alcanzados");
+        safeSerialPrint("Máximos intentos de conexión alcanzados");
         startConfigPortal();
         reconnectAttempts = 0;
       } else {
-        Serial.printf("Intentando conexión WiFi (%d/%d)",
-                      reconnectAttempts + 1, config.maxReconnectAttempts);
+        safeSerialPrint("Intentando conexión WiFi (%d/%d)",
+                        reconnectAttempts + 1, config.maxReconnectAttempts);
 
-        WiFi.disconnect(true);
+        //WiFi.disconnect(true);
         WiFi.reconnect();
         reconnectAttempts++;
       }
     } else {
       if (currentState != SystemState::BELL_WIFI_CONNECTED) {
-        Serial.println("WiFi conectado");
+        safeSerialPrint("WiFi conectado");
         updateSystemState(SystemState::BELL_WIFI_CONNECTED);
         reconnectAttempts = 0;
       }
     }
   }
 }
-void MQTTTask(void* parameter) {
+void keepMQTTTask(void* parameter) {
   for (;;) {
-    vTaskDelay(pdMS_TO_TICKS(4000));  // Wait for 10 seconds before checking again
+    vTaskDelay(pdMS_TO_TICKS(10000));  // Wait for 10 seconds before checking again
 
     if (!mqttClient.connected()) {
 
-      Serial.print(F("Attempting MQTT connection..."));
+      safeSerialPrint(F("Attempting MQTT connection..."));
       char nameCliente[50];
       snprintf(nameCliente, sizeof(nameCliente), "BellControl(%s)", WiFi.macAddress().c_str());
 
       if (mqttClient.connect(nameCliente, config.mqttUser, config.mqttPassword)) {
-        Serial.println(F("connected"));
-        mqttClient.subscribe(config.topicConfig);   // Subscribe to the response topic after connecting
-        mqttClient.subscribe(config.topicControl);  // Subscribe to the response topic after connecting
+        safeSerialPrint(F("MQTT connected"));
+        mqttClient.subscribe(config.topicConfigSchedule);  // Subscribe to the response topic after connecting
+        mqttClient.subscribe(config.topicRemoteControl);   // Subscribe to the response topic after connecting
+        mqttClient.subscribe(config.topicRequestSchedule);   // Subscribe to the response topic after connecting
       } else {
-        Serial.print(F("failed, rc="));
-        Serial.print(mqttClient.state());
-        Serial.println(F(" try again in 10 seconds"));
+        safeSerialPrint(F("failed, rc="));
+        safeSerialPrint(mqttClient.state());
+        safeSerialPrint(F(" try again in 10 seconds"));
       }
     }
   }
 }
 void timeTask(void* parameter) {
-  const TickType_t xFrequency = pdMS_TO_TICKS(5000);
+  const TickType_t xFrequency = pdMS_TO_TICKS(10000);
   TickType_t xLastWakeTime = xTaskGetTickCount();
   bool timeSynced = false;
 
   for (;;) {
-    // 1. Verificar estado WiFi de forma segura
     SystemState currentStateCopy;
     if (xSemaphoreTake(BellSystemState, pdMS_TO_TICKS(100))) {
       currentStateCopy = currentState;
@@ -226,27 +240,75 @@ void timeTask(void* parameter) {
       currentStateCopy = SystemState::BELL_WIFI_DISCONNECTED;
     }
 
-    // 2. Solo actuar si WiFi está conectado
     if (currentStateCopy == SystemState::BELL_WIFI_CONNECTED) {
       if (!timeSynced) {
         if (timeClient.forceUpdate()) {
-          Serial.println("Hora sincronizada via NTP");
+          safeSerialPrint("Hora sincronizada via NTP");
           timeSynced = true;
         } else {
-          Serial.println("Error sincronizando hora");
+          safeSerialPrint("Error sincronizando hora");
         }
       }
 
-      // Actualizar y mostrar hora
       timeClient.update();
-      Serial.println(timeClient.getFormattedTime());
 
+      //Obtener la hora y el día actual
+      String currentTime = timeClient.getFormattedTime().substring(0, 5);  // "HH:MM"
+      int currentDay = timeClient.getDay();                                // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+
+      //Mapeo de día numérico a clave en JSON
+      const char* dayKeys[] = { "", "L", "M", "X", "J", "V", "" };  // 0 y 6 (domingo/sábado) no tienen asignación
+      if (currentDay < 1 || currentDay > 5) {
+        safeSerialPrint("Hoy no hay horarios programados.");
+      } else {
+        const char* currentDayKey = dayKeys[currentDay];
+
+
+        // TOMAR EL MUTEX ANTES DE LEER NVS
+        if (xSemaphoreTake(nvsMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+          //Leer configuración desde NVS
+          Preferences preferences;
+          if (preferences.begin("configSchedule", true)) {
+            String jsonSchedule = preferences.getString("jsonSchedule", "{}");
+            preferences.end();
+
+            // LIBERAR EL MUTEX DESPUÉS DE LEER
+            xSemaphoreGive(nvsMutex);
+
+            //Convertir a JSON
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, jsonSchedule);
+
+            if (error) {
+              safeSerialPrint("Error al leer JSON de NVS.");
+            } else {
+              JsonObject schedule = doc["data"]["schedule"];
+
+              if (schedule[currentDayKey].is<JsonArray>()) {
+                JsonArray daySchedule = schedule[currentDayKey];
+
+                // Comparar la hora actual con los horarios guardados
+                for (JsonVariant time : daySchedule) {
+                  if (time.as<String>() == currentTime) {
+                    safeSerialPrint("Activando campana: " + currentTime);
+                    activateBuzzer(2000);  // Activar campana 2s
+                    break;
+                  }
+                }
+              }
+            }
+          } else {
+            xSemaphoreGive(nvsMutex);
+            safeSerialPrint("No se pudo abrir NVS para leer horarios.");
+          }
+        } else {
+          safeSerialPrint("No se pudo tomar el semaforo en processMessage timeTask.");
+        }
+      }
     } else {
-      timeSynced = false;  // Resetear bandera si se pierde conexión
-      Serial.println("Esperando conexión WiFi para sincronizar hora...");
+      timeSynced = false;
+      safeSerialPrint("Esperando conexión WiFi para sincronizar hora...");
     }
-
-    // 3. Esperar hasta el próximo ciclo de manera segura
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -256,7 +318,7 @@ void mqttProcessorTask(void* parameter) {
   for (;;) {
     if (xQueueReceive(mqttQueue, &receivedMsg, portMAX_DELAY)) {
       // Procesar el mensaje
-      Serial.println("dato recibido en cola");
+      safeSerialPrint("dato recibido en cola");
       processMessage(receivedMsg);
 
       // Liberar memoria después de procesar
@@ -292,38 +354,162 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 void processMessage(MQTTMessage* msg) {
-
   JsonDocument doc;
 
   // Parsear JSON
   DeserializationError error = deserializeJson(doc, msg->payload, msg->payload_len);
   if (error) {
-    Serial.printf("Error parsing JSON: %s\n", error.c_str());
+    safeSerialPrint("Error parsing JSON: %s\n", error.c_str());
     return;
   }
-  Serial.println("dato recibido en processMessage");
-  // Ejemplo: Procesar tu payload de configuración
-  if (strcmp(msg->topic, config.topicConfig) == 0) {
-    JsonObject schedules = doc["s"];
-
-    // Iterar días de la semana
-    const char* days[] = { "L", "M", "X", "J", "V" };
-    for (const char* day : days) {
-      JsonArray times = schedules[day];
-      for (JsonVariant time : times) {
-        Serial.printf("Hora programada %s: %s\n", day, time.as<const char*>());
-      }
-    }
+  // Verificar el tópico y llamar a la función correspondiente
+  if (strcmp(msg->topic, config.topicConfigSchedule) == 0) {
+    processConfigSchedule(doc);
+  } else if (strcmp(msg->topic, config.topicRemoteControl) == 0) {
+    processRemoteControl(doc);
+  } else if (strcmp(msg->topic, config.topicRequestSchedule) == 0) {
+    sendScheduleConfig();
+  }
+}
+// Procesar configuración del horario
+void processConfigSchedule(JsonDocument& doc) {
+  if (!doc["data"].is<JsonObject>() || !doc["data"]["schedule"].is<JsonObject>()) {
+    safeSerialPrint("Error: JSON inválido. Falta 'data' o 'schedule'.\n");
+    sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"Falta 'data' o 'schedule'"})");
+    return;
   }
 
-  // Aquí añadirías más lógica para otros tópicos
+  JsonObject schedules = doc["data"]["schedule"];
+  const char* days[] = { "L", "M", "X", "J", "V" };
+  bool hasErrors = false;
+
+  safeSerialPrint("Configuración recibida:\n");
+
+  for (const char* day : days) {
+    if (!schedules[day].is<JsonArray>()) {
+      safeSerialPrint("Advertencia: Falta el día %s en la configuración.\n", day);
+      hasErrors = true;
+      continue;
+    }
+
+    JsonArray times = schedules[day];
+    safeSerialPrint("%s: ", day);
+
+    if (times.size() == 0) {
+      safeSerialPrint("Sin horarios\n");
+      continue;
+    }
+
+    for (JsonVariant time : times) {
+      if (!time.is<const char*>()) {
+        safeSerialPrint("Error: Formato incorrecto en %s, debe ser una cadena de hora.\n", day);
+        hasErrors = true;
+        break;
+      }
+      safeSerialPrint("%s ", time.as<const char*>());
+    }
+    safeSerialPrint("\n");
+  }
+
+  if (hasErrors) {
+    sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"Errores en la configuración"})");
+    return;
+  }
+
+  // 🔹 TOMAR EL MUTEX ANTES DE ESCRIBIR EN NVS
+  if (xSemaphoreTake(nvsMutex, pdMS_TO_TICKS(500)) == pdTRUE) {
+    // 🔹 Guardar en NVS
+    Preferences preferences;
+    if (!preferences.begin("configSchedule", false)) {
+      xSemaphoreGive(nvsMutex);
+      safeSerialPrint("Error: No se pudo abrir la NVS.");
+      sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"No se pudo acceder a la NVS"})");
+      return;
+    }
+
+    // 🔹 Convertimos el JSON a string
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    // 🔹 Verificamos que la conversión sea válida
+    if (jsonString.length() == 0) {
+      preferences.end();
+      xSemaphoreGive(nvsMutex);
+      safeSerialPrint("Error: No se pudo convertir el JSON a cadena.");
+      sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"Error al convertir JSON"})");
+
+      return;
+    }
+
+    // Guardamos la configuración en la NVS
+    size_t nvsSaved = preferences.putString("jsonSchedule", jsonString);
+    preferences.end();  //Siempre cerramos NVS
+    xSemaphoreGive(nvsMutex);
+
+    if (nvsSaved > 0) {
+      safeSerialPrint("Configuración guardada en NVS.");
+      sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"OK","message":"Configuración guardada"})");
+    } else {
+      safeSerialPrint("Error: No se pudo guardar en NVS.");
+      sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"Error al guardar en NVS"})");
+    }
+  } else {
+    safeSerialPrint("No se pudo tomar el semaforo en processMessage.");
+  }
+}
+// Procesar control de la campana
+void processRemoteControl(JsonDocument& doc) {
+  if (!doc["data"].is<JsonObject>()) {
+    safeSerialPrint("Error: JSON inválido. Falta 'data' o no es un objeto.\n");
+    sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"JSON inválido. Falta 'data' o no es un objeto."})");
+    return;
+  }
+
+  JsonObject data = doc["data"];
+  if (!data["action"].is<const char*>()) {
+    safeSerialPrint("Error: 'action' faltante o no es una cadena de texto.\n");
+    sendMqttResponse(config.topicConfigSchedule_reply, R"({"status":"ERROR","message":"JSON inválido. 'action' faltante o no es una cadena de texto."})");
+    return;
+  }
+
+  const char* action = data["action"];
+  if (strcmp(action, "ring") == 0) {
+    int duration = data["duration"].is<int>() ? data["duration"].as<int>() : 2000;
+    activateBuzzer(duration);
+  }
+}
+void sendScheduleConfig() {
+  String jsonSchedule = "{}";  // Valor por defecto
+  bool success = false;
+
+  // Intentar tomar el mutex antes de leer la NVS
+  if (xSemaphoreTake(nvsMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+    Preferences preferences;
+    if (preferences.begin("configSchedule", true)) {
+      jsonSchedule = preferences.getString("jsonSchedule", "{}");
+      preferences.end();
+      success = true;  // Indica que la lectura fue exitosa
+    } else {
+      safeSerialPrint("Error: No se pudo abrir la NVS en sendScheduleConfig.");
+    }
+    xSemaphoreGive(nvsMutex);
+  } else {
+    safeSerialPrint("Error: No se pudo obtener acceso a la NVS en sendScheduleConfig.");
+  }
+
+  // Enviar la respuesta MQTT
+  if (success) {
+    sendMqttResponse(config.topicRequestSchedule_reply, jsonSchedule.c_str());
+  } else {
+    sendMqttResponse(config.topicRequestSchedule_reply, R"({"status":"ERROR","message":"No se pudo leer la configuración"})");
+  }
 }
 void sendMqttResponse(const char* topic, const char* message) {
   if (xSemaphoreTake(mqttSendMessage, pdMS_TO_TICKS(250))) {
     if (mqttClient.publish(topic, message)) {
-      Serial.printf("Mensaje publicado en %s", topic);
+      safeSerialPrint("Mensaje publicado en %s", topic);
     } else {
-      Serial.printf("Error publicando en %s", topic);
+      safeSerialPrint("Error publicando en %s", topic);
     }
     xSemaphoreGive(mqttSendMessage);
   }
@@ -334,31 +520,29 @@ void sendMqttResponse(const char* topic, const char* message) {
 
 /* ******************* CONTROL DE HARDWARE ******************* */
 void activateBell(int durationMs) {
+  char response[64];
+  snprintf(response, sizeof(response),
+           "{\"status\":\"OK\",\"action\":\"bell\",\"duration\":%d}",
+           durationMs);
+  sendMqttResponse(config.topicRemoteControl_reply, response);
+
   digitalWrite(config.relayPIN, HIGH);
   safeDelay(durationMs);
   digitalWrite(config.relayPIN, LOW);
-
+}
+void activateBuzzer(int durationMs) {
   char response[64];
   snprintf(response, sizeof(response),
            "{\"status\":\"OK\",\"action\":\"bell\",\"duration\":%d}",
            durationMs);
-  sendMqttResponse(config.topicStatus, response);
-}
-void testBuzzer(int durationMs) {
+  sendMqttResponse(config.topicRemoteControl_reply, response);
   digitalWrite(config.buzzerPin, HIGH);
   safeDelay(durationMs);
   digitalWrite(config.buzzerPin, LOW);
-
-  char response[64];
-  snprintf(response, sizeof(response),
-           "{\"status\":\"OK\",\"action\":\"bell\",\"duration\":%d}",
-           durationMs);
-  sendMqttResponse(config.topicStatus, response);
 }
 /* ******************* FIN CONTROL DE HARDWARE ******************* */
 
 //------------------------------------------------------------------
-
 
 void updateSystemState(SystemState newState) {
   static SystemState previousState = SystemState::BELL_INITIALIZING;
@@ -371,21 +555,48 @@ void updateSystemState(SystemState newState) {
     xSemaphoreGive(BellSystemState);
   }
 }
-
 void startConfigPortal() {
   updateSystemState(SystemState::BELL_CONFIG_PORTAL_ACTIVE);
-  Serial.println("Iniciando portal de configuración");
+  safeSerialPrint("Iniciando portal de configuración");
 
   wm.setConfigPortalTimeout(120);  // Set config portal timeout
 
   if (!wm.startConfigPortal("BellControl-AP")) {
-    Serial.printf("Error en portal de configuración");
+    safeSerialPrint("Error en portal de configuración");
     ESP.restart();
   }
 
   updateSystemState(SystemState::BELL_WIFI_CONNECTED);
 }
+void safeSerialPrint(const char* format, ...) {
+  char buffer[128];  // Ajusta el tamaño según sea necesario
 
+  va_list args;
+  va_start(args, format);
+  int len = vsnprintf(buffer, sizeof(buffer), format, args);
+  va_end(args);
+
+  if (len > 0) {
+    buffer[len] = '\n';  // Agregar salto de línea
+    buffer[len + 1] = '\0';
+    // Intentar tomar el semáforo antes de escribir
+    if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+      Serial.write((uint8_t*)buffer, len + 1);
+      xSemaphoreGive(serialMutex);  // Liberar semáforo
+    }
+  }
+}
+void safeSerialPrint(int num) {
+  safeSerialPrint("%d", num);
+}
+void safeSerialPrint(const String& str) {
+  String output = str + "\n";  // Agregar salto de línea
+
+  if (xSemaphoreTake(serialMutex, portMAX_DELAY) == pdTRUE) {
+    Serial.write((uint8_t*)output.c_str(), output.length());
+    xSemaphoreGive(serialMutex);
+  }
+}
 void safeDelay(uint32_t ms) {
   const TickType_t xDelay = pdMS_TO_TICKS(ms);
   TickType_t xLastWakeTime = xTaskGetTickCount();
