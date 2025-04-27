@@ -142,8 +142,8 @@ body {
 /* Response Section */
 /* Styles for the response container and individual responses */
 #responses {
-    max-height: 300px; /* Limit the height of the container */
-    min-height: 10%; /* Set a default minimum height */
+    max-height: 140px; /* Limit the height of the container */
+    min-height: 50%; /* Set a default minimum height */
     overflow-y: auto; /* Enable scrolling if content exceeds height */
     padding: 1rem; /* Internal spacing */
     background: #f9fafb; /* Light gray background */
