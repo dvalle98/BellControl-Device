@@ -17,6 +17,7 @@ body {
 /* Card Styles */
 /* Styles for reusable card components */
 .card {
+    min-height: 200px;
     background: white; /* White background for contrast */
     padding: 1.5rem; /* Internal spacing */
     border-radius: 1rem; /* Rounded corners */
